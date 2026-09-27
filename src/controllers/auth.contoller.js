@@ -11,30 +11,27 @@ export const register = async (req, res) => {
 
     if (userFound) return res.status(400).json(["The email is already in use"]);
 
-    // hashing the password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // creating the user
     const newUser = new User({
       username,
       email,
       password: passwordHash,
     });
 
-    // saving the user in the database
     const userSaved = await newUser.save();
 
-    // create access token
     const token = await createAccessToken({
       id: userSaved._id,
     });
 
-    res.cookie("token", token, { sameSite: "None" });
+    res.cookie("token", token, { sameSite: "Lax" });
 
     res.json({
       id: userSaved._id,
       username: userSaved.username,
       email: userSaved.email,
+      token,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -63,7 +60,7 @@ export const login = async (req, res) => {
       username: userFound.username,
     });
 
-    res.cookie("token", token, { sameSite: "None" });
+    res.cookie("token", token, { sameSite: "Lax" });
 
     res.json({
       id: userFound._id,
@@ -94,7 +91,11 @@ export const logout = async (req, res) => {
 };
 
 export const verifyToken = async (req, res) => {
-  const { token } = req.cookies;
+  let token = req.cookies.token;
+  const authHeader = req.headers["authorization"];
+  if (!token && authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.split(" ")[1];
+  }
   console.log(token);
   if (!token) return res.status(401).json({ message: "Unauthorized1" });
   jwt.verify(token, TOKEN_SECRET, async (err, user) => {
